@@ -1,0 +1,13 @@
+server:
+  port: 9000  # Порт Gateway
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          uri: http://localhost:8080  # Адрес и порт вашего user-service
+          predicates:
+            - Path=/users/**           # Прокси всех запросов с /users/**
+          filters:
+            - RewritePath=/users/(?<segment>.*), /users/${segment}  # Проброс пути без изменений
