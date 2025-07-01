@@ -8,6 +8,13 @@ public class UserUpdateResponse {
     private String email;
     private int age;
     private Date createdAt;
+    private String message;
+
+    public UserUpdateResponse(String s) {
+        this.message = s;
+    }
+
+    public UserUpdateResponse(){}
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
