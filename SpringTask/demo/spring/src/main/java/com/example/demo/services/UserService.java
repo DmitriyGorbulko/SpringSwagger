@@ -1,5 +1,6 @@
 package com.example.demo.services;
 
+import com.example.demo.config.KafkaProducerService;
 import com.example.demo.dto.*;
 import com.example.demo.entities.User;
 import com.example.demo.mapper.UserMapper;
@@ -14,15 +15,18 @@ public class UserService {
 
     private final UserRepository userRepository;
     private static final String CIRCUIT_BREAKER_NAME = "userServiceCB";
+    private final KafkaProducerService kafkaProducerService;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, KafkaProducerService kafkaProducerService) {
         this.userRepository = userRepository;
+        this.kafkaProducerService = kafkaProducerService;
     }
 
     @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "createUserFallback")
     public UserPostResponse createUser(UserPostRequest request) {
         User user = UserMapper.toEntity(request);
         User savedUser = userRepository.save(user);
+        kafkaProducerService.sendUserEvent(new UserEvent(savedUser.getEmail(), "CREATE"));
         return UserMapper.toCreateResponse(savedUser);
     }
 
@@ -64,10 +68,10 @@ public class UserService {
     @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "deleteUserFallback")
     public void deleteUser(UserDeleteRequest request) {
         Long id = UserMapper.toId(request);
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found with id: " + id);
-        }
-        userRepository.deleteById(id);
+        userRepository.findById(id).ifPresent(user -> {
+            userRepository.deleteById(id);
+            kafkaProducerService.sendUserEvent(new UserEvent(user.getEmail(), "DELETE"));
+        });
     }
 
     public void deleteUserFallback(UserDeleteRequest request, Throwable t) {
